@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="application-name" content="Emergency Card">
+<meta name="description" content="Your vital medical info at a glance for emergencies — name, blood type, allergies, conditions, and an ICE contact.">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Emergency Card</title>
+<style>
+:root{--accent:#EF4444;--bg:#100808;--card:#1B0E0E;--text:#FDF1F1;--dim:#E3B8B8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100dvh;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.app{width:min(480px,100vw - 24px);height:100dvh;max-height:780px;display:flex;flex-direction:column;padding:16px 14px 12px;gap:12px}
+h1{font-size:20px;color:var(--accent);text-align:center;letter-spacing:.5px}
+.view{flex:1;min-height:0;display:none;flex-direction:column;gap:10px;overflow-y:auto}
+.view.on{display:flex}
+.field{background:var(--card);border:1px solid #3F1D1D;border-radius:14px;padding:12px 14px}
+.field .lab{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--accent);margin-bottom:4px}
+.field .val{font-size:24px;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+.field .val.name{font-size:32px}
+.empty{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center}
+.empty p{font-size:17px;color:var(--dim);line-height:1.5}
+.editform{flex:1;min-height:0;display:none;flex-direction:column;gap:10px;overflow-y:auto}
+.editform.on{display:flex}
+.editform label{font-size:13px;font-weight:700;color:var(--dim);letter-spacing:.5px}
+.editform input{min-height:52px;font-size:17px;border-radius:12px;border:1px solid #4A2424;background:#100808;color:var(--text);padding:0 14px;font-family:inherit;-webkit-user-select:text;user-select:text}
+button{min-height:56px;font-size:18px;font-weight:700;border-radius:14px;border:none}
+button.primary{background:var(--accent);color:#fff}
+button.ghost{background:#241112;border:1px solid #5A2B2B;color:var(--text)}
+.row{display:flex;gap:10px}
+.row button{flex:1}
+button[data-focusable]:focus-visible,input[data-focusable]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>⛑ Emergency Card</h1>
+  <div class="view on" id="view">
+    <div class="empty" id="emptyState">
+      <p>No info saved yet — tap Edit to add your emergency details.</p>
+      <button class="primary" id="editFromEmpty" data-focusable style="min-width:220px">✎ Edit</button>
+    </div>
+    <div id="fields" style="display:none;flex-direction:column;gap:10px">
+      <div class="field"><div class="lab">NAME</div><div class="val name" id="vName"></div></div>
+      <div class="field"><div class="lab">BLOOD TYPE</div><div class="val" id="vBlood"></div></div>
+      <div class="field"><div class="lab">ALLERGIES</div><div class="val" id="vAllergies"></div></div>
+      <div class="field"><div class="lab">CONDITIONS</div><div class="val" id="vConditions"></div></div>
+      <div class="field"><div class="lab">ICE — EMERGENCY CONTACT</div><div class="val" id="vIce"></div></div>
+    </div>
+  </div>
+  <div class="editform" id="editform">
+    <label for="inName">Full name</label>
+    <input type="text" id="inName" data-focusable autocomplete="off" placeholder="Jane Doe">
+    <label for="inBlood">Blood type</label>
+    <input type="text" id="inBlood" data-focusable autocomplete="off" placeholder="O+">
+    <label for="inAllergies">Allergies</label>
+    <input type="text" id="inAllergies" data-focusable autocomplete="off" placeholder="Penicillin">
+    <label for="inConditions">Medical conditions</label>
+    <input type="text" id="inConditions" data-focusable autocomplete="off" placeholder="Asthma">
+    <label for="inIce">ICE contact (name + phone)</label>
+    <input type="text" id="inIce" data-focusable autocomplete="off" placeholder="John Doe — 555-0100">
+    <div class="row">
+      <button class="primary" id="saveBtn" data-focusable>Save</button>
+      <button class="ghost" id="cancelBtn" data-focusable>Cancel</button>
+    </div>
+  </div>
+  <div class="row" id="viewActions">
+    <button class="primary" id="editBtn" data-focusable>✎ Edit</button>
+  </div>
+</div>
+<script>
+(function(){"use strict";
+var KEY="emergency-card-v1";
+var BLANK={name:"",blood:"",allergies:"",conditions:"",ice:""};
+var viewEl=document.getElementById('view');
+var editformEl=document.getElementById('editform');
+var viewActions=document.getElementById('viewActions');
+var emptyState=document.getElementById('emptyState');
+var fieldsEl=document.getElementById('fields');
+var ins={name:document.getElementById('inName'),blood:document.getElementById('inBlood'),
+  allergies:document.getElementById('inAllergies'),conditions:document.getElementById('inConditions'),
+  ice:document.getElementById('inIce')};
+var vals={name:document.getElementById('vName'),blood:document.getElementById('vBlood'),
+  allergies:document.getElementById('vAllergies'),conditions:document.getElementById('vConditions'),
+  ice:document.getElementById('vIce')};
+
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(!raw)return null;
+    var o=JSON.parse(raw);
+    if(!o||typeof o!=="object")return null;
+    var out={};
+    Object.keys(BLANK).forEach(function(k){out[k]=typeof o[k]==="string"?o[k]:"";});
+    return out;
+  }catch(e){return null;}
+}
+function store(d){
+  try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}
+}
+function isEmpty(d){
+  return !d||Object.keys(BLANK).every(function(k){return !(d[k]||"").trim();});
+}
+function showView(){
+  var d=load();
+  viewEl.classList.add("on");
+  editformEl.classList.remove("on");
+  viewActions.style.display="flex";
+  var empty=isEmpty(d);
+  emptyState.style.display=empty?"flex":"none";
+  fieldsEl.style.display=empty?"none":"flex";
+  if(!empty){
+    Object.keys(vals).forEach(function(k){
+      vals[k].textContent=(d[k]||"").trim()||"—";
+    });
+  }
+}
+function showEdit(){
+  var d=load()||BLANK;
+  Object.keys(ins).forEach(function(k){ins[k].value=d[k]||"";});
+  viewEl.classList.remove("on");
+  editformEl.classList.add("on");
+  viewActions.style.display="none";
+  if(ins.name.offsetParent!==null)ins.name.focus();
+}
+document.getElementById('editBtn').addEventListener("click",showEdit);
+document.getElementById('editFromEmpty').addEventListener("click",showEdit);
+document.getElementById('cancelBtn').addEventListener("click",showView);
+document.getElementById('saveBtn').addEventListener("click",function(){
+  var d={};
+  Object.keys(ins).forEach(function(k){d[k]=ins[k].value.trim();});
+  store(d);
+  showView();
+});
+
+function focusables(){
+  return Array.prototype.slice.call(document.querySelectorAll("[data-focusable]"))
+    .filter(function(el){return !el.disabled && el.offsetParent!==null;});
+}
+document.addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&document.activeElement&&document.activeElement.tagName==="INPUT")return;
+  var list=focusables();
+  if(!list.length)return;
+  var i=list.indexOf(document.activeElement);
+  if(e.key==="ArrowRight"||e.key==="ArrowDown"){
+    e.preventDefault();
+    list[(i+1+list.length)%list.length].focus();
+  }else if(e.key==="ArrowLeft"||e.key==="ArrowUp"){
+    e.preventDefault();
+    list[(i-1+list.length)%list.length].focus();
+  }
+});
+showView();
+})();
+</script>
+</body>
+</html>
