@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Emergency Card",
+  "description": "Your vital medical info at a glance: name, blood type, allergies, conditions, ICE contact.",
+  "appearance": {
+    "theme_color": "#EF4444",
+    "icon": {
+      "src": "../icon-mono.png",
+      "type": "monochrome"
+    },
+    "icon_background": {
+      "colors": [
+        "#EF4444",
+        "#7A2424",
+        "#3F1D1D",
+        "#100808"
+      ],
+      "stops": [
+        0.0,
+        0.33,
+        0.66,
+        1.0
+      ],
+      "inner_glow_color": "#FFCCCC"
+    }
+  }
+}
